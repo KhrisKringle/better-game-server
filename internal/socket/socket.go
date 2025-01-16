@@ -11,18 +11,3 @@ var upgrader = websocket.Upgrader{
 		return true
 	},
 }
-
-type Server struct {
-}
-
-func NewServer() *Server {
-	return &Server{}
-}
-
-func (s *Server) HandleConnections(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		return
-	}
-	defer conn.Close()
-}
