@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package websocket;
+
+// Specify Go package
+option go_package = "path/to/your/project/internal/packets";
+
+// Wrapper for all possible messages
+message WebSocketMessage {
+  oneof payload {
+    TextMessage text_message = 1;
+    GameInvite game_invite = 2;
+    UserAction user_action = 3;
+  }
+}
+
+// Message types
+message TextMessage {
+  string content = 1;
+}
+
+message GameInvite {
+  string game_id = 1;
+  string inviter_id = 2;
+  string invitee_id = 3;
+}
+
+message UserAction {
+  string user_id = 1;
+  ActionType action = 2;
+}
+
+enum ActionType {
+  UNKNOWN = 0;
+  LOGIN = 1;
+  LOGOUT = 2;
+  MOVE = 3;
+}

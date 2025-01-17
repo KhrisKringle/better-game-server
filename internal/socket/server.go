@@ -1,6 +1,10 @@
 package socket
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/brightsidedeveloper/better-game-server/internal/packets"
+)
 
 type Server struct {
 	clients map[*Client]bool
@@ -19,23 +23,19 @@ func (s *Server) HandleConnections(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
 
-	client := newClient(conn)
+	c := newClient(conn)
 
-	s.clients[client] = true
+	s.clients[c] = true
 
-	for {
+	go c.readMessages(s)
+	go c.writeMessages()
 
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			delete(s.clients, client)
-			break
-		}
-
-		for c := range s.clients {
-			c.channel <- msg
-		}
-
+	c.send <- &packets.WebSocketMessage{
+		Payload: &packets.WebSocketMessage_TextMessage{
+			TextMessage: &packets.TextMessage{
+				Content: "Woah, it works!",
+			},
+		},
 	}
 }
