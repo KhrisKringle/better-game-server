@@ -3,33 +3,34 @@ package socket
 import (
 	"sync"
 
-	"github.com/google/uuid"
+	"github.com/brightsidedeveloper/better-game-server/internal/packets"
+)
+
+type RoomName string
+
+const (
+	LOBBY  RoomName = "lobby"
+	BATTLE RoomName = "battle"
 )
 
 type Room struct {
-	id      string
-	clients map[*Client]bool
+	name    RoomName
+	clients map[string]*Client
 	mut     sync.Mutex
 }
 
-func NewRoom() *Room {
+func NewRoom(name RoomName) *Room {
 	return &Room{
-		id:      uuid.New().String(),
-		clients: make(map[*Client]bool),
+		name:    name,
+		clients: make(map[string]*Client),
 	}
 }
 
-func (r *Room) AddClient(client *Client) {
+func (r *Room) broadcast(msg *packets.WSMessage) {
 	r.mut.Lock()
 	defer r.mut.Unlock()
-	r.clients[client] = true
-}
 
-func (r *Room) RemoveClient(client *Client) {
-	r.mut.Lock()
-	defer r.mut.Unlock()
-	if _, ok := r.clients[client]; !ok {
-		return
+	for _, c := range r.clients {
+		c.send <- msg
 	}
-	delete(r.clients, client)
 }

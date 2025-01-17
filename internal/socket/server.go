@@ -1,20 +1,21 @@
 package socket
 
 import (
+	"fmt"
 	"net/http"
-
-	"github.com/brightsidedeveloper/better-game-server/internal/packets"
+	"sync"
 )
 
 type Server struct {
-	clients map[*Client]bool
-	rooms   map[string]*Room
+	clients map[string]*Client
+	rooms   map[RoomName]*Room
+	mut     sync.Mutex
 }
 
 func NewServer() *Server {
 	return &Server{
-		clients: make(map[*Client]bool),
-		rooms:   make(map[string]*Room),
+		clients: make(map[string]*Client),
+		rooms:   make(map[RoomName]*Room),
 	}
 }
 
@@ -26,16 +27,33 @@ func (s *Server) HandleConnections(w http.ResponseWriter, r *http.Request) {
 
 	c := newClient(conn)
 
-	s.clients[c] = true
+	s.mut.Lock()
+	s.clients[c.id] = c
+	s.mut.Unlock()
+
+	s.joinRoom(c, LOBBY)
 
 	go c.readMessages(s)
 	go c.writeMessages()
 
-	c.send <- &packets.WebSocketMessage{
-		Payload: &packets.WebSocketMessage_TextMessage{
-			TextMessage: &packets.TextMessage{
-				Content: "Woah, it works!",
-			},
-		},
+	fmt.Println("Clients connected: ", len(s.clients))
+}
+
+func (s *Server) joinRoom(c *Client, name RoomName) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+
+	for _, r := range s.rooms {
+		if r.name == name {
+			r.mut.Lock()
+			fmt.Println("Joining room", r.name)
+			r.clients[c.id] = c
+			return
+		}
 	}
+
+	fmt.Println("Creating room", name)
+	room := NewRoom(name)
+	room.clients[c.id] = c
+	s.rooms[room.name] = room
 }

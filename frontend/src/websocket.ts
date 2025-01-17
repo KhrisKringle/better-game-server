@@ -55,13 +55,11 @@ export function actionTypeToJSON(object: ActionType): string {
 }
 
 /** Wrapper for all possible messages */
-export interface WebSocketMessage {
+export interface WSMessage {
   textMessage?: TextMessage | undefined;
   gameInvite?: GameInvite | undefined;
-  userAction?: UserAction | undefined;
 }
 
-/** Message types */
 export interface TextMessage {
   content: string;
 }
@@ -72,33 +70,25 @@ export interface GameInvite {
   inviteeId: string;
 }
 
-export interface UserAction {
-  userId: string;
-  action: ActionType;
+function createBaseWSMessage(): WSMessage {
+  return { textMessage: undefined, gameInvite: undefined };
 }
 
-function createBaseWebSocketMessage(): WebSocketMessage {
-  return { textMessage: undefined, gameInvite: undefined, userAction: undefined };
-}
-
-export const WebSocketMessage: MessageFns<WebSocketMessage> = {
-  encode(message: WebSocketMessage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const WSMessage: MessageFns<WSMessage> = {
+  encode(message: WSMessage, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.textMessage !== undefined) {
       TextMessage.encode(message.textMessage, writer.uint32(10).fork()).join();
     }
     if (message.gameInvite !== undefined) {
       GameInvite.encode(message.gameInvite, writer.uint32(18).fork()).join();
     }
-    if (message.userAction !== undefined) {
-      UserAction.encode(message.userAction, writer.uint32(26).fork()).join();
-    }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): WebSocketMessage {
+  decode(input: BinaryReader | Uint8Array, length?: number): WSMessage {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseWebSocketMessage();
+    const message = createBaseWSMessage();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -118,14 +108,6 @@ export const WebSocketMessage: MessageFns<WebSocketMessage> = {
           message.gameInvite = GameInvite.decode(reader, reader.uint32());
           continue;
         }
-        case 3: {
-          if (tag !== 26) {
-            break;
-          }
-
-          message.userAction = UserAction.decode(reader, reader.uint32());
-          continue;
-        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -135,15 +117,14 @@ export const WebSocketMessage: MessageFns<WebSocketMessage> = {
     return message;
   },
 
-  fromJSON(object: any): WebSocketMessage {
+  fromJSON(object: any): WSMessage {
     return {
       textMessage: isSet(object.textMessage) ? TextMessage.fromJSON(object.textMessage) : undefined,
       gameInvite: isSet(object.gameInvite) ? GameInvite.fromJSON(object.gameInvite) : undefined,
-      userAction: isSet(object.userAction) ? UserAction.fromJSON(object.userAction) : undefined,
     };
   },
 
-  toJSON(message: WebSocketMessage): unknown {
+  toJSON(message: WSMessage): unknown {
     const obj: any = {};
     if (message.textMessage !== undefined) {
       obj.textMessage = TextMessage.toJSON(message.textMessage);
@@ -151,25 +132,19 @@ export const WebSocketMessage: MessageFns<WebSocketMessage> = {
     if (message.gameInvite !== undefined) {
       obj.gameInvite = GameInvite.toJSON(message.gameInvite);
     }
-    if (message.userAction !== undefined) {
-      obj.userAction = UserAction.toJSON(message.userAction);
-    }
     return obj;
   },
 
-  create<I extends Exact<DeepPartial<WebSocketMessage>, I>>(base?: I): WebSocketMessage {
-    return WebSocketMessage.fromPartial(base ?? ({} as any));
+  create<I extends Exact<DeepPartial<WSMessage>, I>>(base?: I): WSMessage {
+    return WSMessage.fromPartial(base ?? ({} as any));
   },
-  fromPartial<I extends Exact<DeepPartial<WebSocketMessage>, I>>(object: I): WebSocketMessage {
-    const message = createBaseWebSocketMessage();
+  fromPartial<I extends Exact<DeepPartial<WSMessage>, I>>(object: I): WSMessage {
+    const message = createBaseWSMessage();
     message.textMessage = (object.textMessage !== undefined && object.textMessage !== null)
       ? TextMessage.fromPartial(object.textMessage)
       : undefined;
     message.gameInvite = (object.gameInvite !== undefined && object.gameInvite !== null)
       ? GameInvite.fromPartial(object.gameInvite)
-      : undefined;
-    message.userAction = (object.userAction !== undefined && object.userAction !== null)
-      ? UserAction.fromPartial(object.userAction)
       : undefined;
     return message;
   },
@@ -321,82 +296,6 @@ export const GameInvite: MessageFns<GameInvite> = {
     message.gameId = object.gameId ?? "";
     message.inviterId = object.inviterId ?? "";
     message.inviteeId = object.inviteeId ?? "";
-    return message;
-  },
-};
-
-function createBaseUserAction(): UserAction {
-  return { userId: "", action: 0 };
-}
-
-export const UserAction: MessageFns<UserAction> = {
-  encode(message: UserAction, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.userId !== "") {
-      writer.uint32(10).string(message.userId);
-    }
-    if (message.action !== 0) {
-      writer.uint32(16).int32(message.action);
-    }
-    return writer;
-  },
-
-  decode(input: BinaryReader | Uint8Array, length?: number): UserAction {
-    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseUserAction();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1: {
-          if (tag !== 10) {
-            break;
-          }
-
-          message.userId = reader.string();
-          continue;
-        }
-        case 2: {
-          if (tag !== 16) {
-            break;
-          }
-
-          message.action = reader.int32() as any;
-          continue;
-        }
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skip(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): UserAction {
-    return {
-      userId: isSet(object.userId) ? globalThis.String(object.userId) : "",
-      action: isSet(object.action) ? actionTypeFromJSON(object.action) : 0,
-    };
-  },
-
-  toJSON(message: UserAction): unknown {
-    const obj: any = {};
-    if (message.userId !== "") {
-      obj.userId = message.userId;
-    }
-    if (message.action !== 0) {
-      obj.action = actionTypeToJSON(message.action);
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<UserAction>, I>>(base?: I): UserAction {
-    return UserAction.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<UserAction>, I>>(object: I): UserAction {
-    const message = createBaseUserAction();
-    message.userId = object.userId ?? "";
-    message.action = object.action ?? 0;
     return message;
   },
 };

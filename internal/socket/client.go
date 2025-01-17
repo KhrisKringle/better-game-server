@@ -12,14 +12,15 @@ import (
 type Client struct {
 	id   string
 	conn *websocket.Conn
-	send chan *packets.WebSocketMessage
+	room *Room
+	send chan *packets.WSMessage
 }
 
 func newClient(conn *websocket.Conn) *Client {
 	client := &Client{
 		id:   uuid.New().String(),
 		conn: conn,
-		send: make(chan *packets.WebSocketMessage),
+		send: make(chan *packets.WSMessage),
 	}
 
 	return client
@@ -27,7 +28,7 @@ func newClient(conn *websocket.Conn) *Client {
 
 func (c *Client) readMessages(s *Server) {
 	defer func() {
-		delete(s.clients, c)
+		delete(s.clients, c.id)
 		c.conn.Close()
 	}()
 
@@ -38,19 +39,22 @@ func (c *Client) readMessages(s *Server) {
 			break
 		}
 
-		var message packets.WebSocketMessage
+		var message packets.WSMessage
 		if err := proto.Unmarshal(msg, &message); err != nil {
 			fmt.Println(err)
 			continue
 		}
 
 		switch payload := message.Payload.(type) {
-		case *packets.WebSocketMessage_TextMessage:
-			fmt.Println("TextMessage", payload.TextMessage)
-		case *packets.WebSocketMessage_UserAction:
-			fmt.Println("UserAction", payload.UserAction)
-		case *packets.WebSocketMessage_GameInvite:
-			fmt.Println("GameInvite", payload.GameInvite)
+		case *packets.WSMessage_TextMessage:
+			msg := &packets.WSMessage{
+				Payload: &packets.WSMessage_TextMessage{
+					TextMessage: &packets.TextMessage{
+						Content: payload.TextMessage.Content,
+					},
+				},
+			}
+			c.room.broadcast(msg)
 		default:
 			fmt.Println("Unknown message type")
 		}
@@ -63,7 +67,7 @@ func (c *Client) writeMessages() {
 	}
 }
 
-func (c *Client) write(msg *packets.WebSocketMessage) {
+func (c *Client) write(msg *packets.WSMessage) {
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		fmt.Println(err)
